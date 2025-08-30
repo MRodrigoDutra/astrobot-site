@@ -41,13 +41,19 @@ function EnhancedCalendar({
   const handleMonthSelect = (monthIndex: string) => {
     const newDate = new Date(currentDisplayYear, parseInt(monthIndex), 1);
     setDisplayMonth(newDate);
-    props.onMonthChange?.(newDate);
+    // Force immediate re-render by calling onMonthChange
+    if (props.onMonthChange) {
+      props.onMonthChange(newDate);
+    }
   };
 
   const handleYearSelect = (year: string) => {
     const newDate = new Date(parseInt(year), currentMonth, 1);
     setDisplayMonth(newDate);
-    props.onMonthChange?.(newDate);
+    // Force immediate re-render by calling onMonthChange
+    if (props.onMonthChange) {
+      props.onMonthChange(newDate);
+    }
   };
 
   return (
@@ -89,9 +95,13 @@ function EnhancedCalendar({
         IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
         Caption: () => (
           <div className="flex items-center justify-center space-x-2">
-            <Select onValueChange={handleMonthSelect} value={currentMonth.toString()}>
+            <Select 
+              onValueChange={handleMonthSelect} 
+              value={currentMonth.toString()}
+              key={`month-${currentMonth}`}
+            >
               <SelectTrigger className="w-32 h-8 text-sm border-primary/30">
-                <SelectValue />
+                <SelectValue placeholder={months[currentMonth]} />
               </SelectTrigger>
               <SelectContent className="bg-popover/95 backdrop-blur-md border-primary/20">
                 {months.map((month, index) => (
@@ -102,9 +112,13 @@ function EnhancedCalendar({
               </SelectContent>
             </Select>
             
-            <Select onValueChange={handleYearSelect} value={currentDisplayYear.toString()}>
+            <Select 
+              onValueChange={handleYearSelect} 
+              value={currentDisplayYear.toString()}
+              key={`year-${currentDisplayYear}`}
+            >
               <SelectTrigger className="w-20 h-8 text-sm border-primary/30">
-                <SelectValue />
+                <SelectValue placeholder={currentDisplayYear.toString()} />
               </SelectTrigger>
               <SelectContent className="bg-popover/95 backdrop-blur-md border-primary/20 max-h-60">
                 {years.map((year) => (
@@ -120,9 +134,12 @@ function EnhancedCalendar({
       month={displayMonth}
       onMonthChange={(month) => {
         setDisplayMonth(month);
-        props.onMonthChange?.(month);
+        if (props.onMonthChange) {
+          props.onMonthChange(month);
+        }
       }}
       weekStartsOn={1}
+      key={`calendar-${displayMonth.getTime()}`}
       {...props}
     />
   );
