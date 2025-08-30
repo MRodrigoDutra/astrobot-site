@@ -25,8 +25,8 @@ import {
 import { PlaceAutocomplete, Place } from '@/components/PlaceAutocomplete';
 import cosmicBackground from '@/assets/cosmic-background.jpg';
 
-// Time validation regex
-const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+// 24h time validation regex - strict format HH:mm
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const formSchema = z.object({
   birthDate: z.date({
@@ -39,7 +39,7 @@ const formSchema = z.object({
   
   birthTime: z.string()
     .min(1, "A hora de nascimento é obrigatória.")
-    .regex(timeRegex, "Formato inválido. Use HH:mm (24h)."),
+    .regex(timeRegex, "Formato inválido. Use HH:mm (exemplo: 14:30)."),
   
   birthPlace: z.string()
     .min(1, "A cidade de nascimento é obrigatória."),
@@ -81,7 +81,7 @@ export function AstrologyForm() {
 
   // Watch form values for submit button state
   const watchedValues = form.watch();
-  const isFormValid = form.formState.isValid && selectedPlace?.timezone;
+  const isFormValid = form.formState.isValid && selectedPlace && selectedPlace.timezone;
 
   function onSubmit(data: FormData) {
     if (!selectedPlace) {
@@ -96,7 +96,7 @@ export function AstrologyForm() {
       birthTime: data.birthTime,
       place: {
         city: selectedPlace.city,
-        admin: selectedPlace.admin,
+        admin: selectedPlace.admin || "",
         country: selectedPlace.country,
         countryCode: selectedPlace.countryCode,
         lat: selectedPlace.lat,
@@ -153,7 +153,7 @@ export function AstrologyForm() {
                           type="date"
                           value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
                           onChange={(e) => {
-                            const date = e.target.value ? new Date(e.target.value) : null;
+                            const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : null;
                             field.onChange(date);
                           }}
                           min="1900-01-01"
@@ -212,7 +212,8 @@ export function AstrologyForm() {
                     <FormControl>
                       <Input
                         type="time"
-                        placeholder="00:00"
+                        step="60"
+                        placeholder="14:30"
                         {...field}
                         className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
                       />

@@ -73,7 +73,7 @@ export function PlaceAutocomplete({
       setIsLoading(true);
       try {
         const response = await fetch(
-          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(debouncedSearchTerm)}&type=city&limit=5&lang=pt&apiKey=${GEOAPIFY_API_KEY}`
+          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(debouncedSearchTerm)}&type=city&limit=7&lang=pt&apiKey=${GEOAPIFY_API_KEY}`
         );
         
         if (!response.ok) throw new Error('Search failed');

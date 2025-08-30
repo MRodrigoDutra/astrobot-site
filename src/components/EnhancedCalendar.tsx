@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
@@ -31,14 +31,23 @@ function EnhancedCalendar({
   const currentMonth = displayMonth.getMonth();
   const currentDisplayYear = displayMonth.getFullYear();
 
+  // Update displayMonth when props.month changes (for controlled usage)
+  useEffect(() => {
+    if (props.month && props.month.getTime() !== displayMonth.getTime()) {
+      setDisplayMonth(props.month);
+    }
+  }, [props.month]);
+
   const handleMonthSelect = (monthIndex: string) => {
     const newDate = new Date(currentDisplayYear, parseInt(monthIndex), 1);
     setDisplayMonth(newDate);
+    props.onMonthChange?.(newDate);
   };
 
   const handleYearSelect = (year: string) => {
     const newDate = new Date(parseInt(year), currentMonth, 1);
     setDisplayMonth(newDate);
+    props.onMonthChange?.(newDate);
   };
 
   return (
@@ -109,7 +118,11 @@ function EnhancedCalendar({
         ),
       }}
       month={displayMonth}
-      onMonthChange={setDisplayMonth}
+      onMonthChange={(month) => {
+        setDisplayMonth(month);
+        props.onMonthChange?.(month);
+      }}
+      weekStartsOn={1}
       {...props}
     />
   );
