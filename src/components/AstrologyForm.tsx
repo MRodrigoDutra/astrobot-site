@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { CalendarIcon, Clock, MapPin, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { EnhancedCalendar } from '@/components/EnhancedCalendar';
+import { MuiDatePicker } from '@/components/MuiDatePicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
@@ -17,11 +17,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { PlaceAutocomplete, Place } from '@/components/PlaceAutocomplete';
 import cosmicBackground from '@/assets/cosmic-background.jpg';
 
@@ -162,37 +157,16 @@ export function AstrologyForm() {
                         />
                       </FormControl>
                     ) : (
-                      // Desktop: Use enhanced calendar
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal border-primary/30 hover:border-primary/50 hover:bg-primary/5",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy")
-                              ) : (
-                                <span>Selecione uma data</span>
-                              )}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-popover/95 backdrop-blur-md" align="start">
-                          <EnhancedCalendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                            initialFocus
-                            month={field.value}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      // Desktop: Use MUI DatePicker
+                      <FormControl>
+                        <MuiDatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Selecione uma data"
+                          error={!!form.formState.errors.birthDate}
+                          helperText={form.formState.errors.birthDate?.message}
+                        />
+                      </FormControl>
                     )}
                     <FormMessage />
                   </FormItem>
