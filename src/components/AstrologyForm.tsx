@@ -24,6 +24,9 @@ import cosmicBackground from '@/assets/cosmic-background.jpg';
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const formSchema = z.object({
+  fullName: z.string()
+    .min(2, "O nome completo é obrigatório.")
+    .max(150, "Nome muito longo. Digite apenas uma parte do nome que identifique você."),
   birthDate: z.date({
     required_error: "A data de nascimento é obrigatória.",
   }).refine(date => {
@@ -39,6 +42,10 @@ const formSchema = z.object({
   birthPlace: z.string()
     .min(1, "A cidade de nascimento é obrigatória."),
   
+  email: z.string()
+    .email("Digite um e-mail válido.")
+    .min(1, "O e-mail é obrigatório."),
+
   place: z.object({
     city: z.string(),
     admin: z.string().optional(),
@@ -85,10 +92,26 @@ export function AstrologyForm() {
       });
       return;
     }
+  // Recebe o timezone string, por exemplo: "America/Sao_Paulo"
+  function getTimezoneOffsetISO(timezone: string, date: Date = new Date()): string {
+    const localDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+    // Corrige arredondamento usando Math.round
+    const offsetMinutes = Math.round((localDate.getTime() - date.getTime()) / 60000 + date.getTimezoneOffset());
+    const sign = offsetMinutes <= 0 ? "+" : "-";
+    const absMinutes = Math.abs(offsetMinutes);
+    const hours = String(Math.floor(absMinutes / 60)).padStart(2, "0");
+    const minutes = String(absMinutes % 60).padStart(2, "0");
+    return `${sign}${hours}:${minutes}`;
+  }
+
+// Calcule o offset numérico do timezone
+  const timezoneOffset = getTimezoneOffsetISO(selectedPlace.timezone);
 
     const payload = {
+      fullName: data.fullName,
       birthDate: format(data.birthDate, 'yyyy-MM-dd'),
       birthTime: data.birthTime,
+      email: data.email,
       place: {
         city: selectedPlace.city,
         admin: selectedPlace.admin || "",
@@ -97,13 +120,33 @@ export function AstrologyForm() {
         lat: selectedPlace.lat,
         lon: selectedPlace.lon,
         timezone: selectedPlace.timezone,
+        timezoneOffset,
         provider: selectedPlace.provider,
         placeId: selectedPlace.placeId,
       }
     };
 
     console.log('Payload do mapa astral:', payload);
-    // Here you would send the payload to your backend
+    // Envia para o webhook do n8n
+  fetch('https://n8n.jornada-automation.shop/webhook-test/astro-form', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(response => {
+      if (!response.ok) throw new Error('Erro ao enviar para o n8n');
+      return response.json();
+    })
+    .then(data => {
+      // Sucesso: você pode mostrar um toast ou redirecionar
+      console.log('Enviado para o n8n:', data);
+    })
+    .catch(error => {
+      // Erro: mostre uma mensagem para o usuário
+      console.error(error);
+    });
   }
 
   return (
@@ -130,98 +173,143 @@ export function AstrologyForm() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Birth Date Field */}
-              <FormField
-                control={form.control}
-                name="birthDate"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabel className="text-foreground font-medium flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-cosmic-blue" />
-                      Data de Nascimento
-                    </FormLabel>
-                    
-                    {isMobile ? (
-                      // Mobile: Use native date input
+                {/* Nome Completo Field */}
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-foreground font-medium flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-cosmic-gold" />
+                        Nome Completo
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          type="date"
-                          value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                          onChange={(e) => {
-                            const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : null;
-                            field.onChange(date);
-                          }}
-                          min="1900-01-01"
-                          max={format(new Date(), 'yyyy-MM-dd')}
+                          type="text"
+                          placeholder="Digite seu nome completo"
+                          {...field}
+                          className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
+                          autoComplete="name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Birth Date Field */}
+                <FormField
+                  control={form.control}
+                  name="birthDate"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-foreground font-medium flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-cosmic-blue" />
+                        Data de Nascimento
+                      </FormLabel>
+                      
+                      {isMobile ? (
+                        // Mobile: Use native date input
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                            onChange={(e) => {
+                              const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : null;
+                              field.onChange(date);
+                            }}
+                            min="1900-01-01"
+                            max={format(new Date(), 'yyyy-MM-dd')}
+                            className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
+                          />
+                        </FormControl>
+                      ) : (
+                        // Desktop: Use MUI DatePicker
+                        <FormControl>
+                          <MuiDatePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Selecione uma data"
+                            error={!!form.formState.errors.birthDate}
+                            helperText={form.formState.errors.birthDate?.message}
+                          />
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Birth Time Field */}
+                <FormField
+                  control={form.control}
+                  name="birthTime"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-foreground font-medium flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-cosmic-violet" />
+                        Hora de Nascimento
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          step="60"
+                          placeholder="14:30"
+                          {...field}
                           className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
                         />
                       </FormControl>
-                    ) : (
-                      // Desktop: Use MUI DatePicker
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Birth Place Field with Autocomplete */}
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-foreground font-medium flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-cosmic-gold" />
+                          E-mail
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="Digite seu e-mail"
+                            {...field}
+                            className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
+                            autoComplete="email"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
+                  control={form.control}
+                  name="birthPlace"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-foreground font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-cosmic-gold" />
+                        Cidade de Nascimento
+                      </FormLabel>
                       <FormControl>
-                        <MuiDatePicker
-                          value={field.value}
+                        <PlaceAutocomplete
+                          value={field.value || ''}
                           onChange={field.onChange}
-                          placeholder="Selecione uma data"
-                          error={!!form.formState.errors.birthDate}
-                          helperText={form.formState.errors.birthDate?.message}
+                          onPlaceSelect={(place) => {
+                            setSelectedPlace(place);
+                            if (place) {
+                              form.clearErrors('birthPlace');
+                            }
+                          }}
+                          placeholder="Ex: São Paulo, SP"
+                          error={form.formState.errors.birthPlace?.message}
                         />
                       </FormControl>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Birth Time Field */}
-              <FormField
-                control={form.control}
-                name="birthTime"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabel className="text-foreground font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-cosmic-violet" />
-                      Hora de Nascimento
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="time"
-                        step="60"
-                        placeholder="14:30"
-                        {...field}
-                        className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Birth Place Field with Autocomplete */}
-              <FormField
-                control={form.control}
-                name="birthPlace"
-                render={({ field }) => (
-                  <FormItem className="space-y-2">
-                    <FormLabel className="text-foreground font-medium flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-cosmic-gold" />
-                      Cidade de Nascimento
-                    </FormLabel>
-                    <FormControl>
-                      <PlaceAutocomplete
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        onPlaceSelect={(place) => {
-                          setSelectedPlace(place);
-                          if (place) {
-                            form.clearErrors('birthPlace');
-                          }
-                        }}
-                        placeholder="Ex: São Paulo, SP"
-                        error={form.formState.errors.birthPlace?.message}
-                      />
-                    </FormControl>
-                    <FormMessage />
+                      <FormMessage />
                     
                     {selectedPlace && (
                       <div className="text-xs text-muted-foreground bg-muted/30 rounded-md p-2">

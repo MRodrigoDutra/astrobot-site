@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
+import React, { useState, useEffect } from 'react';
+import tzLookup from 'tz-lookup';
+
 const queryClient = new QueryClient();
 
 const App = () => (
