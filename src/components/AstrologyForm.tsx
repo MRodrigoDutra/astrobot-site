@@ -20,51 +20,58 @@ import { Input } from '@/components/ui/input';
 import { PlaceAutocomplete, Place } from '@/components/PlaceAutocomplete';
 import cosmicBackground from '@/assets/cosmic-background.jpg';
 
-// 👉 URL do webhook via variável de ambiente (definida no *build* do Vite)
+// URL do webhook via variável de ambiente (definida no build do Vite)
 const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string | undefined;
 
 // 24h time validation regex - strict format HH:mm
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const formSchema = z.object({
-  fullName: z.string()
-    .min(2, "O nome completo é obrigatório.")
-    .max(150, "Nome muito longo. Digite apenas uma parte do nome que identifique você."),
-  birthDate: z.date({
-    required_error: "A data de nascimento é obrigatória.",
-  }).refine(date => {
-    const now = new Date();
-    const minDate = new Date(1900, 0, 1);
-    return date >= minDate && date <= now;
-  }, "Data deve estar entre 1900 e hoje."),
-  birthTime: z.string()
-    .min(1, "A hora de nascimento é obrigatória.")
-    .regex(timeRegex, "Formato inválido. Use HH:mm (exemplo: 14:30)."),
-  birthPlace: z.string().min(1, "A cidade de nascimento é obrigatória."),
-  email: z.string().email("Digite um e-mail válido.").min(1, "O e-mail é obrigatório."),
-  place: z.object({
-    city: z.string(),
-    admin: z.string().optional(),
-    country: z.string(),
-    countryCode: z.string(),
-    lat: z.number(),
-    lon: z.number(),
-    timezone: z.string(),
-    provider: z.string(),
-    placeId: z.string(),
-  }).optional(),
+  fullName: z
+    .string()
+    .min(2, 'O nome completo é obrigatório.')
+    .max(150, 'Nome muito longo. Digite apenas uma parte do nome que identifique você.'),
+  birthDate: z
+    .date({ required_error: 'A data de nascimento é obrigatória.' })
+    .refine((date) => {
+      const now = new Date();
+      const minDate = new Date(1900, 0, 1);
+      return date >= minDate && date <= now;
+    }, 'Data deve estar entre 1900 e hoje.'),
+  birthTime: z
+    .string()
+    .min(1, 'A hora de nascimento é obrigatória.')
+    .regex(timeRegex, 'Formato inválido. Use HH:mm (exemplo: 14:30).'),
+  birthPlace: z.string().min(1, 'A cidade de nascimento é obrigatória.'),
+  email: z.string().email('Digite um e-mail válido.').min(1, 'O e-mail é obrigatório.'),
+  // Pode vir preenchido pelo autocomplete; não é obrigatório
+  place: z
+    .object({
+      city: z.string(),
+      admin: z.string().optional(),
+      country: z.string(),
+      countryCode: z.string(),
+      lat: z.number(),
+      lon: z.number(),
+      timezone: z.string(),
+      provider: z.string(),
+      placeId: z.string(),
+    })
+    .optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-// Função utilitária para obter o offset em formato ISO (+HH:MM / -HH:MM)
+// Offset do timezone em formato ISO (+HH:MM / -HH:MM)
 function getTimezoneOffsetISO(timezone: string, date: Date = new Date()): string {
   const localDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
-  const offsetMinutes = Math.round((localDate.getTime() - date.getTime()) / 60000 + date.getTimezoneOffset());
-  const sign = offsetMinutes <= 0 ? "+" : "-";
+  const offsetMinutes = Math.round(
+    (localDate.getTime() - date.getTime()) / 60000 + date.getTimezoneOffset(),
+  );
+  const sign = offsetMinutes <= 0 ? '+' : '-';
   const absMinutes = Math.abs(offsetMinutes);
-  const hours = String(Math.floor(absMinutes / 60)).padStart(2, "0");
-  const minutes = String(absMinutes % 60).padStart(2, "0");
+  const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+  const minutes = String(absMinutes % 60).padStart(2, '0');
   return `${sign}${hours}:${minutes}`;
 }
 
@@ -77,12 +84,12 @@ export function AstrologyForm() {
     mode: 'onChange',
   });
 
-  // Detect mobile for native date input fallback
+  // Detecta mobile para usar input nativo de data
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(
         window.innerWidth <= 768 ||
-        /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+          /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
       );
     };
     checkMobile();
@@ -90,10 +97,8 @@ export function AstrologyForm() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const watchedValues = form.watch();
-  const isFormValid = form.formState.isValid && !!selectedPlace && !!selectedPlace.timezone;
+  const isFormValid = form.formState.isValid && !!selectedPlace?.timezone;
 
-  // 👉 agora async e usando a env WEBHOOK_URL
   async function onSubmit(data: FormData) {
     if (!selectedPlace) {
       form.setError('birthPlace', { message: 'Selecione uma cidade das sugestões.' });
@@ -114,7 +119,7 @@ export function AstrologyForm() {
       email: data.email,
       place: {
         city: selectedPlace.city,
-        admin: selectedPlace.admin || "",
+        admin: selectedPlace.admin || '',
         country: selectedPlace.country,
         countryCode: selectedPlace.countryCode,
         lat: selectedPlace.lat,
@@ -123,25 +128,23 @@ export function AstrologyForm() {
         timezoneOffset,
         provider: selectedPlace.provider,
         placeId: selectedPlace.placeId,
-      }
+      },
     };
 
     try {
-      console.log('Payload do mapa astral:', payload);
       const res = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`Erro ao enviar para o n8n: ${res.status}`);
-      const json = await res.json().catch(() => ({}));
-      console.log('Enviado para o n8n:', json);
-
-      // TODO: exibir toast de sucesso/resetar formulário se quiser
+      // Caso o webhook não retorne JSON, evita crash
+      await res.json().catch(() => ({}));
+      // Ex: aqui você pode exibir um toast e/ou resetar o form
       // form.reset();
     } catch (err) {
       console.error(err);
-      // TODO: exibir toast/erro amigável ao usuário
+      // Ex: exibir toast de erro amigável
     }
   }
 
@@ -210,7 +213,9 @@ export function AstrologyForm() {
                           type="date"
                           value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
                           onChange={(e) => {
-                            const date = e.target.value ? new Date(e.target.value + 'T00:00:00') : null;
+                            const date = e.target.value
+                              ? new Date(e.target.value + 'T00:00:00')
+                              : null;
                             field.onChange(date);
                           }}
                           min="1900-01-01"
@@ -298,4 +303,43 @@ export function AstrologyForm() {
                         onChange={field.onChange}
                         onPlaceSelect={(place) => {
                           setSelectedPlace(place);
-                          if (place) form.clearErrors('birthPlace');
+                          if (place) {
+                            form.clearErrors('birthPlace');
+                          }
+                        }}
+                        placeholder="Ex: São Paulo, SP"
+                        error={form.formState.errors.birthPlace?.message}
+                      />
+                    </FormControl>
+                    <FormMessage />
+
+                    {selectedPlace && (
+                      <div className="text-xs text-muted-foreground bg-muted/30 rounded-md p-2">
+                        📍 {selectedPlace.city}, {selectedPlace.country} • 🌍 {selectedPlace.timezone}
+                      </div>
+                    )}
+                  </FormItem>
+                )}
+              />
+
+              {/* Botão */}
+              <Button
+                type="submit"
+                disabled={!isFormValid}
+                className={cn(
+                  'w-full font-semibold py-3 shadow-cosmic transition-all duration-300',
+                  isFormValid
+                    ? 'bg-gradient-cosmic hover:opacity-90 text-primary-foreground hover:shadow-mystical'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed',
+                )}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Calcular Mapa
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
