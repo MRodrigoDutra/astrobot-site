@@ -12,6 +12,10 @@ COPY . .
 # Build com variáveis de build do Vite (se precisar)
 ARG VITE_GEOAPIFY_API_KEY
 ENV VITE_GEOAPIFY_API_KEY=${VITE_GEOAPIFY_API_KEY}
+ARG VITE_N8N_WEBHOOK_URL
+ENV VITE_N8N_WEBHOOK_URL=${VITE_N8N_WEBHOOK_URL}
+RUN npm run build
+
 
 # Gera a pasta dist/
 RUN npm run build
