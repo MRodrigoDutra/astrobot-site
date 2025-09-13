@@ -133,19 +133,40 @@ export function AstrologyForm() {
 
     try {
       const res = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`Erro ao enviar para o n8n: ${res.status}`);
-      // Caso o webhook não retorne JSON, evita crash
-      await res.json().catch(() => ({}));
-      // Ex: aqui você pode exibir um toast e/ou resetar o form
-      // form.reset();
-    } catch (err) {
-      console.error(err);
-      // Ex: exibir toast de erro amigável
-    }
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+
+// se quiser, trate status 4xx/5xx
+if (!res.ok) {
+  const txt = await res.text().catch(() => '');
+  throw new Error(`Erro ${res.status}: ${txt || 'Falha ao processar o relatório'}`);
+}
+
+// o n8n pode devolver HTML ou PDF; tratamos os dois:
+const ct = res.headers.get('content-type') ?? '';
+
+if (ct.includes('text/html')) {
+  // 1) HTML → trocamos o documento atual
+  const html = await res.text();
+  document.open();
+  document.write(html);
+  document.close();
+  return;
+}
+
+if (ct.includes('application/pdf')) {
+  // 2) PDF → abrimos inline
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.location.href = url; // abre o PDF no navegador
+  return;
+}
+
+// 3) fallback (caso venha JSON por algum motivo)
+const data = await res.json().catch(() => ({}));
+console.log('Resposta (fallback JSON):', data);
   }
 
   return (
