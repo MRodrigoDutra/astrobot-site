@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, Clock, MapPin, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { MuiDatePicker } from '@/components/MuiDatePicker';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import { Loader2, Sparkles, CalendarIcon, Clock, MapPin } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { MuiDatePicker } from "@/components/MuiDatePicker";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -15,39 +15,35 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { PlaceAutocomplete, Place } from '@/components/PlaceAutocomplete';
-import cosmicBackground from '@/assets/cosmic-background.jpg';
-import { Loader2, Sparkles, CalendarIcon, Clock, MapPin } from "lucide-react";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { PlaceAutocomplete, Place } from "@/components/PlaceAutocomplete";
+import cosmicBackground from "@/assets/cosmic-background.jpg";
 
-// Botão de Carregamento
-const [submitting, setSubmitting] = useState(false);
-// URL do webhook via variável de ambiente (definida no build do Vite)
+// URL do webhook (defina no ambiente de build do Vite)
 const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL as string | undefined;
 
-// 24h time validation regex - strict format HH:mm
+// Regex HH:mm
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const formSchema = z.object({
   fullName: z
     .string()
-    .min(2, 'O nome completo é obrigatório.')
-    .max(150, 'Nome muito longo. Digite apenas uma parte do nome que identifique você.'),
+    .min(2, "O nome completo é obrigatório.")
+    .max(150, "Nome muito longo. Digite apenas uma parte do nome que identifique você."),
   birthDate: z
-    .date({ required_error: 'A data de nascimento é obrigatória.' })
+    .date({ required_error: "A data de nascimento é obrigatória." })
     .refine((date) => {
       const now = new Date();
       const minDate = new Date(1900, 0, 1);
       return date >= minDate && date <= now;
-    }, 'Data deve estar entre 1900 e hoje.'),
+    }, "Data deve estar entre 1900 e hoje."),
   birthTime: z
     .string()
-    .min(1, 'A hora de nascimento é obrigatória.')
-    .regex(timeRegex, 'Formato inválido. Use HH:mm (exemplo: 14:30).'),
-  birthPlace: z.string().min(1, 'A cidade de nascimento é obrigatória.'),
-  email: z.string().email('Digite um e-mail válido.').min(1, 'O e-mail é obrigatório.'),
-  // Pode vir preenchido pelo autocomplete; não é obrigatório
+    .min(1, "A hora de nascimento é obrigatória.")
+    .regex(timeRegex, "Formato inválido. Use HH:mm (exemplo: 14:30)."),
+  birthPlace: z.string().min(1, "A cidade de nascimento é obrigatória."),
+  email: z.string().email("Digite um e-mail válido.").min(1, "O e-mail é obrigatório."),
   place: z
     .object({
       city: z.string(),
@@ -67,24 +63,25 @@ type FormData = z.infer<typeof formSchema>;
 
 // Offset do timezone em formato ISO (+HH:MM / -HH:MM)
 function getTimezoneOffsetISO(timezone: string, date: Date = new Date()): string {
-  const localDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+  const localDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
   const offsetMinutes = Math.round(
     (localDate.getTime() - date.getTime()) / 60000 + date.getTimezoneOffset(),
   );
-  const sign = offsetMinutes <= 0 ? '+' : '-';
+  const sign = offsetMinutes <= 0 ? "+" : "-";
   const absMinutes = Math.abs(offsetMinutes);
-  const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
-  const minutes = String(absMinutes % 60).padStart(2, '0');
+  const hours = String(Math.floor(absMinutes / 60)).padStart(2, "0");
+  const minutes = String(absMinutes % 60).padStart(2, "0");
   return `${sign}${hours}:${minutes}`;
 }
 
 export function AstrologyForm() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    mode: 'onChange',
+    mode: "onChange",
   });
 
   // Detecta mobile para usar input nativo de data
@@ -96,83 +93,82 @@ export function AstrologyForm() {
       );
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const isFormValid = form.formState.isValid && !!selectedPlace?.timezone;
 
   async function onSubmit(data: FormData) {
-  if (!selectedPlace) {
-    form.setError("birthPlace", { message: "Selecione uma cidade das sugestões." });
-    return;
-  }
-  if (!WEBHOOK_URL) {
-    alert("Configuração do servidor ausente.");
-    return;
-  }
-
-  const timezoneOffset = getTimezoneOffsetISO(selectedPlace.timezone);
-  const payload = {
-    fullName: data.fullName,
-    birthDate: format(data.birthDate, "yyyy-MM-dd"),
-    birthTime: data.birthTime,
-    email: data.email,
-    place: {
-      city: selectedPlace.city,
-      admin: selectedPlace.admin || "",
-      country: selectedPlace.country,
-      countryCode: selectedPlace.countryCode,
-      lat: selectedPlace.lat,
-      lon: selectedPlace.lon,
-      timezone: selectedPlace.timezone,
-      timezoneOffset,
-      provider: selectedPlace.provider,
-      placeId: selectedPlace.placeId,
-    },
-  };
-
-  let navigated = false;
-  setSubmitting(true);
-  try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Erro ${res.status}: ${txt || "Falha ao processar o relatório"}`);
+    if (!selectedPlace) {
+      form.setError("birthPlace", { message: "Selecione uma cidade das sugestões." });
+      return;
     }
-
-    const ct = res.headers.get("content-type") ?? "";
-
-    if (ct.includes("text/html")) {
-      const html = await res.text();
-      document.open(); document.write(html); document.close();
-      navigated = true;
+    if (!WEBHOOK_URL) {
+      alert("Configuração do servidor ausente.");
       return;
     }
 
-    if (ct.includes("application/pdf")) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.location.href = url;
-      navigated = true;
-      return;
+    const timezoneOffset = getTimezoneOffsetISO(selectedPlace.timezone);
+    const payload = {
+      fullName: data.fullName,
+      birthDate: format(data.birthDate, "yyyy-MM-dd"),
+      birthTime: data.birthTime,
+      email: data.email,
+      place: {
+        city: selectedPlace.city,
+        admin: selectedPlace.admin || "",
+        country: selectedPlace.country,
+        countryCode: selectedPlace.countryCode,
+        lat: selectedPlace.lat,
+        lon: selectedPlace.lon,
+        timezone: selectedPlace.timezone,
+        timezoneOffset,
+        provider: selectedPlace.provider,
+        placeId: selectedPlace.placeId,
+      },
+    };
+
+    let navigated = false;
+    setSubmitting(true);
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Erro ${res.status}: ${txt || "Falha ao processar o relatório"}`);
+      }
+
+      const ct = res.headers.get("content-type") ?? "";
+
+      if (ct.includes("text/html")) {
+        const html = await res.text();
+        document.open(); document.write(html); document.close();
+        navigated = true;
+        return;
+      }
+
+      if (ct.includes("application/pdf")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.location.href = url; // abre inline
+        navigated = true;
+        return;
+      }
+
+      // Fallback (quase nunca usado)
+      await res.json().catch(() => ({}));
+    } catch (err) {
+      console.error(err);
+      alert("Não foi possível gerar o relatório agora. Tente novamente.");
+    } finally {
+      if (!navigated) setSubmitting(false);
     }
-
-    // fallback (quase nunca usado)
-    await res.json().catch(() => ({}));
-  } catch (err) {
-    console.error(err);
-    alert("Não foi possível gerar o relatório agora. Tente novamente.");
-  } finally {
-    if (!navigated) setSubmitting(false);
   }
-}
-
 
   return (
     <div
@@ -237,15 +233,15 @@ export function AstrologyForm() {
                       <FormControl>
                         <Input
                           type="date"
-                          value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           onChange={(e) => {
                             const date = e.target.value
-                              ? new Date(e.target.value + 'T00:00:00')
+                              ? new Date(e.target.value + "T00:00:00")
                               : null;
                             field.onChange(date);
                           }}
                           min="1900-01-01"
-                          max={format(new Date(), 'yyyy-MM-dd')}
+                          max={format(new Date(), "yyyy-MM-dd")}
                           className="border-primary/30 focus:border-primary/50 bg-input/50 backdrop-blur-sm"
                         />
                       </FormControl>
@@ -325,12 +321,12 @@ export function AstrologyForm() {
                     </FormLabel>
                     <FormControl>
                       <PlaceAutocomplete
-                        value={field.value || ''}
+                        value={field.value || ""}
                         onChange={field.onChange}
                         onPlaceSelect={(place) => {
                           setSelectedPlace(place);
                           if (place) {
-                            form.clearErrors('birthPlace');
+                            form.clearErrors("birthPlace");
                           }
                         }}
                         placeholder="Ex: São Paulo, SP"
@@ -350,33 +346,47 @@ export function AstrologyForm() {
 
               {/* Botão */}
               <Button
-  type="submit"
-  disabled={!isFormValid || submitting}
-  aria-busy={submitting}
-  className={cn(
-    "w-full font-semibold py-3 shadow-cosmic transition-all duration-300",
-    isFormValid && !submitting
-      ? "bg-gradient-cosmic hover:opacity-90 text-primary-foreground hover:shadow-mystical"
-      : "bg-muted text-muted-foreground cursor-not-allowed"
-  )}
->
-  {submitting ? (
-    <>
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      Calculando…
-    </>
-  ) : (
-    <>
-      <Sparkles className="mr-2 h-4 w-4" />
-      Calcular Mapa
-    </>
-  )}
-</Button>
-
+                type="submit"
+                disabled={!isFormValid || submitting}
+                aria-busy={submitting}
+                className={cn(
+                  "w-full font-semibold py-3 shadow-cosmic transition-all duration-300",
+                  isFormValid && !submitting
+                    ? "bg-gradient-cosmic hover:opacity-90 text-primary-foreground hover:shadow-mystical"
+                    : "bg-muted text-muted-foreground cursor-not-allowed",
+                )}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Calculando…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Calcular Mapa
+                  </>
+                )}
+              </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
+
+      {/* Overlay de processamento */}
+      {submitting && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 rounded-xl p-6 shadow-lg text-center max-w-sm">
+            <div className="flex items-center justify-center mb-3">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+            <p className="font-medium">Calculando seu temperamento…</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Isso leva alguns instantes. A página será atualizada automaticamente.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
