@@ -165,9 +165,12 @@ if (ct.includes('application/pdf')) {
 }
 
 // 3) fallback (caso venha JSON por algum motivo)
-const data = await res.json().catch(() => ({}));
-console.log('Resposta (fallback JSON):', data);
-  }
+await res.json().catch(() => ({}));
+} catch (err) {                    
+    console.error(err);
+    alert('Não foi possível gerar o relatório agora. Tente novamente.');
+  }                                  
+}  
 
   return (
     <div
