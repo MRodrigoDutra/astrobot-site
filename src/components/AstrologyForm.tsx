@@ -182,12 +182,12 @@ export function AstrologyForm() {
           <div className="flex items-center justify-center gap-2 mb-2">
             <Sparkles className="h-6 w-6 text-cosmic-gold" />
             <CardTitle className="text-2xl font-bold bg-gradient-cosmic bg-clip-text text-transparent">
-              Gere seu Mapa Astral
+              Calcule o seu Temperamento
             </CardTitle>
             <Sparkles className="h-6 w-6 text-cosmic-gold" />
           </div>
           <CardDescription className="text-muted-foreground">
-            Descubra os segredos das estrelas inserindo seus dados de nascimento
+            Descubra como a Astrologia Tradicional pode te ajudar a descobrir o seu Temperamento
           </CardDescription>
         </CardHeader>
 
